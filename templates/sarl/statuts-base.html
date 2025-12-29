@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statuts de {{DENOMINATION}}</title>
+    <style>
+        @page {
+            margin: 2cm;
+            @bottom-center {
+                content: "Page " counter(page) " sur " counter(pages);
+                font-size: 10pt;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: 'Times New Roman', serif;
+            font-size: 12pt;
+            line-height: 1.5;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 3cm;
+            border-bottom: 2px solid #333;
+            padding-bottom: 1cm;
+        }
+        
+        .title {
+            font-size: 18pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 0.5cm;
+        }
+        
+        .subtitle {
+            font-size: 14pt;
+            font-style: italic;
+            margin-bottom: 1cm;
+        }
+        
+        .article {
+            margin-bottom: 2cm;
+            page-break-inside: avoid;
+        }
+        
+        .article-title {
+            font-size: 14pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 0.5cm;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 0.2cm;
+        }
+        
+        .article-content {
+            text-align: justify;
+            margin-left: 1cm;
+        }
+        
+        .article-content p {
+            margin-bottom: 0.5cm;
+        }
+        
+        .emphasis {
+            font-weight: bold;
+        }
+        
+        .indent {
+            margin-left: 1cm;
+        }
+        
+        .signature-section {
+            margin-top: 3cm;
+            page-break-inside: avoid;
+        }
+        
+        .signature-block {
+            width: 45%;
+            float: left;
+            text-align: center;
+            border-top: 1px solid #333;
+            padding-top: 0.5cm;
+            margin-top: 2cm;
+        }
+        
+        .signature-block.right {
+            float: right;
+        }
+        
+        .legal-mention {
+            font-size: 10pt;
+            color: #666;
+            font-style: italic;
+            margin-top: 2cm;
+            text-align: center;
+            clear: both;
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1cm 0;
+        }
+        
+        .table th, .table td {
+            border: 1px solid #333;
+            padding: 0.3cm;
+            text-align: left;
+        }
+        
+        .table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        
+        @media print {
+            .page-break {
+                page-break-before: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">Statuts de Société</h1>
+        <h2 class="subtitle">Société à Responsabilité Limitée (SARL)</h2>
+        <p class="emphasis">{{DENOMINATION}}</p>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 1 - Constitution et dénomination</h2>
+        <div class="article-content">
+            <p>Il est formé entre les soussignés et toutes personnes qui pourraient devenir par la suite associés, une société à responsabilité limitée régie par les dispositions du Code de commerce et notamment les articles L. 223-1 et suivants, ainsi que par les présents statuts.</p>
+            <p>La société a pour dénomination : <span class="emphasis">{{DENOMINATION}}</span></p>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 2 - Siège social</h2>
+        <div class="article-content">
+            <p>Le siège social est fixé à :</p>
+            <p class="indent emphasis">{{SIEGE_COMPLET}}</p>
+            <p>Il pourra être transféré en tout autre lieu par simple décision du gérant, sous réserve de ratification par l'assemblée générale ordinaire.</p>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 3 - Objet social</h2>
+        <div class="article-content">
+            <p>La société a pour objet :</p>
+            <p class="indent emphasis">{{OBJET}}</p>
+            <p>Et généralement, toutes opérations industrielles, commerciales, financières, mobilières et immobilières se rapportant directement ou indirectement à cet objet ou susceptibles d'en faciliter l'extension ou le développement.</p>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 4 - Durée</h2>
+        <div class="article-content">
+            <p>La durée de la société est fixée à <span class="emphasis">{{DUREE}} années</span> à compter de son immatriculation au Registre du Commerce et des Sociétés, sauf dissolution anticipée ou prorogation.</p>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 5 - Capital social</h2>
+        <div class="article-content">
+            <p>Le capital social est fixé à la somme de <span class="emphasis">{{CAPITAL}} euros</span>.</p>
+            <p>Il est divisé en parts sociales d'un euro chacune, entièrement souscrites et libérées, réparties entre les associés proportionnellement à leurs apports respectifs.</p>
+            
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Associé</th>
+                        <th>Nombre de parts</th>
+                        <th>Pourcentage</th>
+                        <th>Montant (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{TABLEAU_ASSOCIES}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 6 - Parts sociales</h2>
+        <div class="article-content">
+            <p>Les parts sociales ne peuvent être cédées qu'avec l'agrément de la majorité des associés représentant au moins la moitié des parts sociales.</p>
+            <p>Toute cession de parts sociales doit faire l'objet d'un acte écrit et être signifiée à la société.</p>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 7 - Gérance</h2>
+        <div class="article-content">
+            <p>La société est gérée par un ou plusieurs gérants, associés ou non, nommés par l'assemblée générale des associés.</p>
+            <p>Est nommé gérant de la société :</p>
+            <p class="indent emphasis">{{GERANT_COMPLET}}</p>
+            <p>Le gérant est investi des pouvoirs les plus étendus pour agir en toute circonstance au nom de la société dans la limite de l'objet social et sous réserve des pouvoirs expressément dévolus par la loi aux assemblées d'associés.</p>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 8 - Décisions collectives</h2>
+        <div class="article-content">
+            <p>Les décisions collectives sont prises en assemblée générale ou par consultation écrite des associés.</p>
+            <p>Chaque associé dispose d'un nombre de voix égal à celui de ses parts sociales.</p>
+            <p>Les décisions ordinaires sont prises à la majorité des voix des associés présents ou représentés.</p>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 9 - Exercice social</h2>
+        <div class="article-content">
+            <p>L'exercice social commence le 1er janvier et finit le 31 décembre de chaque année.</p>
+            <p>Exceptionnellement, le premier exercice commencera le jour de l'immatriculation de la société au Registre du Commerce et des Sociétés pour finir le 31 décembre {{ANNEE_CREATION}}.</p>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 10 - Bénéfices</h2>
+        <div class="article-content">
+            <p>Les bénéfices, après constitution des réserves légales et statutaires, sont répartis entre les associés proportionnellement à leurs parts sociales.</p>
+        </div>
+    </div>
+
+    <div class="article">
+        <h2 class="article-title">Article 11 - Dissolution - Liquidation</h2>
+        <div class="article-content">
+            <p>À l'expiration de la société ou en cas de dissolution anticipée, la liquidation sera effectuée par le gérant ou tout autre liquidateur nommé par l'assemblée générale.</p>
+            <p>L'actif net subsistant après remboursement du capital sera réparti entre les associés dans les mêmes proportions que leurs parts dans le capital.</p>
+        </div>
+    </div>
+
+    <div class="signature-section">
+        <p>Fait à {{VILLE_SIEGE}}, le {{DATE_CREATION}}</p>
+        
+        <div class="signature-block">
+            <p><strong>Le Gérant</strong></p>
+            <p>{{GERANT_COMPLET}}</p>
+            <br><br>
+            <p>Signature</p>
+        </div>
+        
+        <div class="signature-block right">
+            <p><strong>Les Associés</strong></p>
+            <br><br>
+            <p>Signatures</p>
+        </div>
+    </div>
+
+    <div class="legal-mention">
+        <p>Document généré automatiquement - Conforme au Code de commerce français</p>
+        <p>Statuts établis le {{DATE_GENERATION}} par SARL Creator</p>
+    </div>
+</body>
+</html>
