@@ -1,32 +1,14 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs'
-import path from 'path'
+import { prisma } from '@/lib/prisma'
 import { getFormality } from '@/lib/formalities/configs'
 import { generateFormalityPdf } from '@/lib/formality-pdf'
-
-// Stockage MVP : on persiste les soumissions dans un fichier JSON.
-// En production : remplacer par une vraie écriture en base via Prisma + Stripe Checkout.
-const SUBMISSIONS_DIR = path.join(process.cwd(), '.data')
-const SUBMISSIONS_FILE = path.join(SUBMISSIONS_DIR, 'formality-submissions.json')
-
-function loadSubmissions() {
-  try {
-    if (!fs.existsSync(SUBMISSIONS_FILE)) return []
-    return JSON.parse(fs.readFileSync(SUBMISSIONS_FILE, 'utf8'))
-  } catch {
-    return []
-  }
-}
-
-function saveSubmissions(list) {
-  if (!fs.existsSync(SUBMISSIONS_DIR)) fs.mkdirSync(SUBMISSIONS_DIR, { recursive: true })
-  fs.writeFileSync(SUBMISSIONS_FILE, JSON.stringify(list, null, 2))
-}
 
 export async function POST(request) {
   try {
     const body = await request.json()
     const { category, type, data } = body
+
     const formality = getFormality(category, type)
     if (!formality) {
       return NextResponse.json({ success: false, error: 'Formalité inconnue' }, { status: 400 })
@@ -51,37 +33,104 @@ export async function POST(request) {
       )
     }
 
-    const id = `${category}-${type}-${Date.now()}`
-    const submission = {
-      id,
-      category,
-      type,
-      data,
-      price: formality.price,
-      createdAt: new Date().toISOString(),
-      status: 'pending_payment',
-    }
-    const list = loadSubmissions()
-    list.push(submission)
-    saveSubmissions(list)
+    // Création de la formalité en DB
+    const formalityRecord = await prisma.formality.create({
+      data: {
+        category,
+        type,
+        price: formality.price,
+        data,
+        status: 'PENDING_PAYMENT',
+      },
+    })
 
-    // PDF — en MVP, on génère immédiatement après soumission.
-    // En production : générer après confirmation Stripe webhook.
+    // Génération du PDF (en MVP, immédiatement après soumission)
+    // En production : à déclencher après confirmation Stripe webhook
     let pdfResult = null
+    let documentRecord = null
     try {
-      pdfResult = await generateFormalityPdf(formality, data, id)
+      pdfResult = await generateFormalityPdf(formality, data, formalityRecord.id)
+
+      if (pdfResult?.success) {
+        // Récupération de la taille du fichier
+        let sizeBytes = null
+        try {
+          const fullPath = `${process.cwd()}/public${pdfResult.downloadUrl}`
+          sizeBytes = fs.statSync(fullPath).size
+        } catch {}
+
+        // Inscription du document généré en DB
+        documentRecord = await prisma.document.create({
+          data: {
+            type: mapDocumentType(category, type),
+            filename: pdfResult.filename,
+            path: pdfResult.downloadUrl,
+            sizeBytes,
+            formalityId: formalityRecord.id,
+          },
+        })
+
+        await prisma.formality.update({
+          where: { id: formalityRecord.id },
+          data: { status: 'DOCUMENTS_GENERATED' },
+        })
+      }
     } catch (e) {
       console.error('PDF gen failed:', e)
+      await prisma.formality.update({
+        where: { id: formalityRecord.id },
+        data: { status: 'FAILED' },
+      })
     }
 
     return NextResponse.json({
       success: true,
-      submissionId: id,
+      submissionId: formalityRecord.id,
       pdf: pdfResult,
-      // Pour MVP : redirige vers une page de confirmation. À brancher sur Stripe Checkout.
-      redirectUrl: `/formality/confirmation?id=${id}`,
+      document: documentRecord
+        ? { id: documentRecord.id, filename: documentRecord.filename, downloadUrl: documentRecord.path }
+        : null,
+      redirectUrl: `/formality/confirmation?id=${formalityRecord.id}`,
     })
+  } catch (e) {
+    console.error('Formality POST error:', e)
+    return NextResponse.json({ success: false, error: e.message }, { status: 500 })
+  }
+}
+
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (id) {
+      const formality = await prisma.formality.findUnique({
+        where: { id },
+        include: { documents: true },
+      })
+      if (!formality) {
+        return NextResponse.json({ success: false, error: 'Formalité introuvable' }, { status: 404 })
+      }
+      return NextResponse.json({ success: true, formality })
+    }
+
+    // Liste — utile pour le dashboard (à brancher sur l'utilisateur connecté plus tard)
+    const list = await prisma.formality.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: { documents: true },
+    })
+    return NextResponse.json({ success: true, formalities: list })
   } catch (e) {
     return NextResponse.json({ success: false, error: e.message }, { status: 500 })
   }
+}
+
+// Mapping catégorie+type vers DocumentType de la DB
+function mapDocumentType(category, type) {
+  if (category === 'creation') return 'STATUTES'
+  if (category === 'cession') return 'CESSION_ACT'
+  if (category === 'modification') return 'PV'
+  if (category === 'dissolution') return 'PV'
+  return 'OTHER'
 }

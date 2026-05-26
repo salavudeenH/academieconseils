@@ -1,18 +1,19 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Schéma Prisma — Académie Conseils
+// Postgres (Neon via Vercel)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
+// ============================================
+//   Utilisateurs
+// ============================================
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -23,85 +24,150 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  companies Company[]
-  orders    Order[]
-  
+  companies     Company[]
+  formalities   Formality[]
+  orders        Order[]
+
   @@map("users")
 }
 
+// ============================================
+//   Sociétés du client (immatriculées)
+// ============================================
 model Company {
-  id                String      @id @default(cuid())
-  name              String
-  type              CompanyType @default(SARL)
-  capital           Int         // Capital social en euros
-  address           String
-  postalCode        String
-  city              String
-  purpose           String      // Objet social
-  duration          Int         @default(99) // Durée en années
-  fiscalYear        String      @default("31/12") // Exercice social
-  
-  // Direction (adaptatif selon le type)
-  manager           String?     // Gérant (SARL, EURL)
-  president         String?     // Président (SAS, SASU)
-  director          String?     // Directeur général (SAS)
-  
-  // Associés/Actionnaires
-  shareholders      Json        // Structure adaptée selon le type
-  
-  // Spécifique SCI
-  civilPurpose      String?     // Objet civil pour SCI
-  
-  // Spécifique SAS/SASU
-  boardMembers      Json?       // Conseil d'administration pour SAS
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  
-  // Relations
-  userId    String
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders    Order[]
-  documents Document[]
-  
+  id           String      @id @default(cuid())
+  name         String
+  type         CompanyType @default(SARL)
+  siren        String?     @unique
+  rcsVille     String?
+  capital      Int
+  address      String
+  postalCode   String
+  city         String
+  purpose      String
+  duration     Int         @default(99)
+  fiscalYear   String      @default("31/12")
+
+  shareholders Json
+  manager      String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  formalities  Formality[]
+
   @@map("companies")
 }
 
-model Order {
-  id            String      @id @default(cuid())
-  amount        Int         // Montant en centimes
-  currency      String      @default("eur")
-  status        OrderStatus @default(PENDING)
-  stripeId      String?     @unique // Stripe Payment Intent ID
-  paidAt        DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  
+// ============================================
+//   Formalités (création / modif / cession / dissolution)
+// ============================================
+model Formality {
+  id          String           @id @default(cuid())
+  category    FormalityCategory
+  type        String           // SARL, SAS, transfert-siege, parts, anticipee, etc.
+  status      FormalityStatus  @default(PENDING_PAYMENT)
+  price       Int              // en euros
+
+  // Données du formulaire (snapshot complet)
+  data        Json
+
+  // Référence Stripe
+  stripeSessionId  String?  @unique
+  stripePaymentId  String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  paidAt      DateTime?
+  completedAt DateTime?
+
   // Relations
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyId String
-  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  documents Document[]
-  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  orders      Order[]
+  documents   Document[]
+
+  @@map("formalities")
+  @@index([userId])
+  @@index([status])
+  @@index([category])
+}
+
+// ============================================
+//   Commandes / paiements
+// ============================================
+model Order {
+  id           String      @id @default(cuid())
+  amount       Int         // en centimes
+  currency     String      @default("eur")
+  status       OrderStatus @default(PENDING)
+  stripeId     String?     @unique
+  paidAt       DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  formalityId  String
+  formality    Formality   @relation(fields: [formalityId], references: [id], onDelete: Cascade)
+
   @@map("orders")
 }
 
+// ============================================
+//   Documents générés (PDF)
+// ============================================
 model Document {
   id          String       @id @default(cuid())
   type        DocumentType
   filename    String
-  path        String       // Chemin vers le fichier PDF
+  path        String       // /documents/xxx.pdf
+  sizeBytes   Int?
   generatedAt DateTime     @default(now())
-  
-  // Relations
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+
+  formalityId String
+  formality   Formality    @relation(fields: [formalityId], references: [id], onDelete: Cascade)
+
   @@map("documents")
+  @@index([formalityId])
+}
+
+// ============================================
+//   Énumérations
+// ============================================
+enum CompanyType {
+  SARL
+  SAS
+  SASU
+  EURL
+  SCI
+  SA
+  AE
+  ASSOC
+}
+
+enum FormalityCategory {
+  creation
+  modification
+  cession
+  dissolution
+}
+
+enum FormalityStatus {
+  PENDING_PAYMENT
+  PAID
+  IN_REVIEW
+  DOCUMENTS_GENERATED
+  FILED_TO_REGISTRY
+  COMPLETED
+  CANCELLED
+  FAILED
 }
 
 enum OrderStatus {
@@ -110,18 +176,18 @@ enum OrderStatus {
   PROCESSING
   COMPLETED
   FAILED
-}
-
-enum CompanyType {
-  SARL    // Société à Responsabilité Limitée
-  SAS     // Société par Actions Simplifiée
-  SASU    // Société par Actions Simplifiée Unipersonnelle
-  EURL    // Entreprise Unipersonnelle à Responsabilité Limitée
-  SCI     // Société Civile Immobilière
+  REFUNDED
 }
 
 enum DocumentType {
-  STATUTES        // Statuts
-  LEGAL_NOTICE    // Annonce légale
-  DECLARATION     // Déclaration
+  STATUTES
+  PV
+  LEGAL_NOTICE
+  DECLARATION
+  CESSION_ACT
+  POWER_OF_ATTORNEY
+  ACCOUNT_DEPOSIT
+  INVOICE
+  KBIS
+  OTHER
 }

@@ -1,10 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export default function ConfirmationPage() {
+  return (
+    <Suspense fallback={<ConfirmationFallback />}>
+      <ConfirmationContent />
+    </Suspense>
+  )
+}
+
+function ConfirmationFallback() {
+  return (
+    <div className="min-h-screen bg-[var(--color-bone-50)] flex items-center justify-center">
+      <div className="text-[var(--color-ink-500)]">Chargement…</div>
+    </div>
+  )
+}
+
+function ConfirmationContent() {
   const params = useSearchParams()
   const id = params.get('id')
   const [mounted, setMounted] = useState(false)

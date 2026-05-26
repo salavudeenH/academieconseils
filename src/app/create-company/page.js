@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
@@ -8,6 +8,26 @@ import Footer from '@/components/Footer'
 import { SERVICE_CATEGORIES } from '@/lib/services'
 
 const COMPANY_TYPES = SERVICE_CATEGORIES.creation.items
+
+export default function CreateCompanyPage() {
+  return (
+    <Suspense fallback={<CreateCompanyFallback />}>
+      <CreateCompanyContent />
+    </Suspense>
+  )
+}
+
+function CreateCompanyFallback() {
+  return (
+    <>
+      <Header />
+      <main className="bg-[var(--color-bone-50)] min-h-[60vh] flex items-center justify-center">
+        <div className="text-[var(--color-ink-500)]">Chargement…</div>
+      </main>
+      <Footer />
+    </>
+  )
+}
 
 const COMPARISON_RAW = [
   { label: 'Capital min.',        SARL: '1 €',    SAS: '1 €',     SASU: '1 €',    EURL: '1 €',    SCI: '1 €',  AE: '—',     ASSOC: '—' },
@@ -18,7 +38,7 @@ const COMPARISON_RAW = [
   { label: 'IS / IR par défaut',  SARL: 'IS',     SAS: 'IS',      SASU: 'IS',     EURL: 'IR',     SCI: 'IR',   AE: 'IR',    ASSOC: '—' },
 ]
 
-export default function CreateCompanyPage() {
+function CreateCompanyContent() {
   const router = useRouter()
   const params = useSearchParams()
   const initialType = params.get('type')
