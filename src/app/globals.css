@@ -1,26 +1,222 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* ============================================
+     Palette Qonto / Pennylane — épurée
+     ============================================ */
+
+  /* Backgrounds (cream très clair, presque blanc) */
+  --color-bone-50:  #FCFAF6;
+  --color-bone-100: #F8F4ED;
+  --color-bone-200: #EFE9DE;
+  --color-bone-300: #E4DCCB;
+
+  /* Ink — quasi noir, hiérarchie typo */
+  --color-ink-950: #0A0A0C;
+  --color-ink-900: #14141A;
+  --color-ink-800: #1F1F28;
+  --color-ink-700: #2D2D38;
+  --color-ink-600: #4A4A55;
+  --color-ink-500: #6B6B75;
+  --color-ink-400: #9A9AA3;
+  --color-ink-300: #C5C5CB;
+
+  /* Accent unique — coral Pennylane */
+  --color-coral-50:  #FFF1EC;
+  --color-coral-100: #FFDCCE;
+  --color-coral-200: #FFB8A0;
+  --color-coral-300: #FF9070;
+  --color-coral-400: #FF6F47;
+  --color-coral-500: #F25130;   /* primary */
+  --color-coral-600: #D63E1E;
+  --color-coral-700: #A82E13;
+
+  /* Pastels secondaires — usage parcimonieux */
+  --color-sage-50:  #F0F4EF;
+  --color-sage-100: #DCE7DA;
+  --color-sage-300: #8AB084;
+  --color-sage-500: #4D7A48;
+
+  --color-mist-50:  #F2F4F7;
+  --color-mist-100: #E4E8EE;
+  --color-mist-300: #B6BFCC;
+
+  --color-lavender-50:  #F3F1F9;
+  --color-lavender-100: #E3DEF1;
+  --color-lavender-300: #A89AE0;
+
+  --color-butter-50:  #FFF8E8;
+  --color-butter-100: #FCEDC1;
+  --color-butter-300: #F2CD66;
+
+  /* Sémantique */
+  --color-background: var(--color-bone-100);
+  --color-foreground: var(--color-ink-900);
+  --color-surface:    #FFFFFF;
+  --color-border:     #E8E1D3;
+  --color-border-strong: #D6CCB8;
+
+  /* Typo */
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  /* Radius — plus contenu, moins "pill" */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  /* Ombres — discrètes */
+  --shadow-xs:   0 1px 2px rgba(20, 20, 26, 0.04);
+  --shadow-sm:   0 1px 2px rgba(20, 20, 26, 0.06), 0 1px 3px rgba(20, 20, 26, 0.04);
+  --shadow-md:   0 4px 12px -2px rgba(20, 20, 26, 0.06), 0 2px 4px rgba(20, 20, 26, 0.04);
+  --shadow-lg:   0 12px 28px -4px rgba(20, 20, 26, 0.10), 0 4px 12px -2px rgba(20, 20, 26, 0.06);
+  --shadow-xl:   0 24px 48px -8px rgba(20, 20, 26, 0.16), 0 8px 24px -4px rgba(20, 20, 26, 0.08);
+  --shadow-pop:  0 16px 32px -8px rgba(242, 81, 48, 0.20), 0 4px 12px rgba(20, 20, 26, 0.06);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body {
+  background: var(--color-bone-100);
+  color: var(--color-ink-900);
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+* {
+  border-color: var(--color-border);
+}
+
+/* ============================================
+   Boutons — style Pennylane
+   ============================================ */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-[var(--color-ink-900)] px-6 py-3 text-[15px] font-semibold text-white transition-all hover:bg-[var(--color-ink-800)] hover:-translate-y-px active:translate-y-0;
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover { box-shadow: var(--shadow-md); }
+
+.btn-accent {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-[var(--color-coral-500)] px-6 py-3 text-[15px] font-semibold text-white transition-all hover:bg-[var(--color-coral-600)] hover:-translate-y-px active:translate-y-0;
+  box-shadow: var(--shadow-sm);
+}
+.btn-accent:hover { box-shadow: var(--shadow-pop); }
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-[15px] font-semibold text-[var(--color-ink-900)] ring-1 ring-[var(--color-border)] transition-all hover:ring-[var(--color-ink-400)] hover:-translate-y-px active:translate-y-0;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-[14px] font-medium text-[var(--color-ink-700)] transition-colors hover:bg-[var(--color-bone-200)];
+}
+
+/* ============================================
+   Inputs
+   ============================================ */
+.input-base {
+  @apply w-full rounded-xl bg-white px-4 py-3 text-[14.5px] text-[var(--color-ink-900)] placeholder:text-[var(--color-ink-400)] ring-1 ring-[var(--color-border)] transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-ink-900)];
+}
+.input-base:hover { border-color: var(--color-border-strong); }
+textarea.input-base { resize: vertical; min-height: 120px; }
+
+.label-base {
+  @apply block text-[12.5px] font-semibold text-[var(--color-ink-700)] mb-1.5;
+}
+
+/* ============================================
+   Cartes
+   ============================================ */
+.card {
+  @apply rounded-2xl bg-white p-6 ring-1 ring-[var(--color-border)] transition-all;
+}
+.card-hover {
+  @apply hover:-translate-y-1 hover:ring-[var(--color-border-strong)];
+}
+.card-hover:hover { box-shadow: var(--shadow-lg); }
+
+/* ============================================
+   Typo display — Manrope ultra tight
+   ============================================ */
+.heading-display {
+  font-family: inherit;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.00;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+.heading-display em {
+  font-style: normal;
+  color: var(--color-coral-500);
+  position: relative;
+}
+
+.heading-section {
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+/* Eyebrow / chip de section */
+.eyebrow {
+  @apply inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink-700)] ring-1 ring-[var(--color-border)];
+}
+
+/* Container */
+.container-page {
+  @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 0.6s ease-out both; }
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+.animate-shimmer::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 2.4s infinite;
+}
+
+/* Sélection */
+::selection {
+  background: var(--color-coral-200);
+  color: var(--color-ink-900);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-bone-300); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-ink-400); }
+
+/* Focus accessible */
+:focus-visible {
+  outline: 2px solid var(--color-coral-500);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Backdrop noise pour ajouter de la texture cream */
+.bg-noise {
+  background-image: radial-gradient(circle at 1px 1px, rgba(20,20,26,0.025) 1px, transparent 0);
+  background-size: 24px 24px;
 }
