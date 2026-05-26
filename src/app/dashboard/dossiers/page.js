@@ -1,36 +1,91 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
 
-const DOSSIERS = [
-  { id: 'cession-parts-1747846291', name: 'Cession de parts sociales', company: 'Cosmo TVS',      formality: 'Cession',      status: 'En cours',             statusColor: 'butter', date: '18 mai 2026',  progress: 60 },
-  { id: 'modif-siege-1746431098',   name: 'Transfert de siège social', company: 'Studio Pollen',  formality: 'Modification', status: 'Terminé',              statusColor: 'sage',   date: '5 mai 2026',   progress: 100 },
-  { id: 'creation-sas-1745098712',  name: 'Création SAS',              company: 'Renaud Conseil', formality: 'Création',     status: 'Terminé',              statusColor: 'sage',   date: '21 avr. 2026', progress: 100 },
-  { id: 'dissolution-1744123456',   name: 'Dissolution',               company: 'Ancienne SCI',   formality: 'Dissolution',  status: 'En attente paiement',  statusColor: 'coral',  date: '15 avr. 2026', progress: 20 },
-]
+const CATEGORY_LABELS = { creation: 'Création', modification: 'Modification', cession: 'Cession', dissolution: 'Dissolution' }
 
-const statusColors = {
+const STATUS_COLORS = {
+  PENDING_PAYMENT:     'butter',
+  PAID:                'butter',
+  IN_REVIEW:           'butter',
+  DOCUMENTS_GENERATED: 'sage',
+  FILED_TO_REGISTRY:   'sage',
+  COMPLETED:           'sage',
+  CANCELLED:           'coral',
+  FAILED:              'coral',
+}
+const STATUS_LABELS = {
+  PENDING_PAYMENT:     'En attente paiement',
+  PAID:                'Payé',
+  IN_REVIEW:           'En revue',
+  DOCUMENTS_GENERATED: 'Documents prêts',
+  FILED_TO_REGISTRY:   'Déposé au greffe',
+  COMPLETED:           'Terminé',
+  CANCELLED:           'Annulé',
+  FAILED:              'Échec',
+}
+const statusClass = {
   butter: 'bg-[var(--color-butter-50)] text-[var(--color-butter-300)] ring-[var(--color-butter-100)]',
   sage:   'bg-[var(--color-sage-50)] text-[var(--color-sage-500)] ring-[var(--color-sage-100)]',
   coral:  'bg-[var(--color-coral-50)] text-[var(--color-coral-600)] ring-[var(--color-coral-100)]',
 }
 
 export default function DossiersPage() {
+  const [formalities, setFormalities] = useState([])
+  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
-  const filtered = DOSSIERS.filter((d) => filter === 'all' || d.formality.toLowerCase() === filter)
+  const [downloadingId, setDownloadingId] = useState(null)
+
+  useEffect(() => {
+    fetch('/api/formality').then((r) => r.json()).then((j) => {
+      if (j.success) setFormalities(j.formalities || [])
+    }).finally(() => setLoading(false))
+  }, [])
+
+  const counts = useMemo(() => ({
+    all: formalities.length,
+    creation: formalities.filter((f) => f.category === 'creation').length,
+    modification: formalities.filter((f) => f.category === 'modification').length,
+    cession: formalities.filter((f) => f.category === 'cession').length,
+    dissolution: formalities.filter((f) => f.category === 'dissolution').length,
+  }), [formalities])
+
+  const filtered = formalities.filter((f) => filter === 'all' || f.category === filter)
+
+  const downloadPdf = async (formalityId) => {
+    setDownloadingId(formalityId)
+    try {
+      const res = await fetch(`/api/formality/${formalityId}/pdf`)
+      if (!res.ok) {
+        alert('Impossible de générer le PDF.')
+        return
+      }
+      const blob = await res.blob()
+      const cd = res.headers.get('Content-Disposition') || ''
+      const m = /filename="([^"]+)"/.exec(cd)
+      const filename = m?.[1] || `document-${formalityId}.pdf`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   return (
     <DashboardLayout title="Mes dossiers" subtitle="Suivez l'avancement de toutes vos formalités.">
       {/* Filtres */}
       <div className="flex flex-wrap gap-2 mb-6 overflow-x-auto">
         {[
-          { id: 'all',         label: 'Tous',          count: DOSSIERS.length },
-          { id: 'création',    label: 'Création',      count: DOSSIERS.filter((d) => d.formality === 'Création').length },
-          { id: 'modification',label: 'Modification',  count: DOSSIERS.filter((d) => d.formality === 'Modification').length },
-          { id: 'cession',     label: 'Cession',       count: DOSSIERS.filter((d) => d.formality === 'Cession').length },
-          { id: 'dissolution', label: 'Dissolution',   count: DOSSIERS.filter((d) => d.formality === 'Dissolution').length },
+          { id: 'all',          label: 'Tous',         count: counts.all },
+          { id: 'creation',     label: 'Création',     count: counts.creation },
+          { id: 'modification', label: 'Modification', count: counts.modification },
+          { id: 'cession',      label: 'Cession',      count: counts.cession },
+          { id: 'dissolution',  label: 'Dissolution',  count: counts.dissolution },
         ].map((f) => {
           const active = filter === f.id
           return (
@@ -52,46 +107,71 @@ export default function DossiersPage() {
         })}
       </div>
 
-      <div className="space-y-3">
-        {filtered.map((d) => (
-          <Link
-            key={d.id}
-            href={`/dashboard/dossiers/${d.id}`}
-            className="block rounded-2xl bg-white ring-1 ring-[var(--color-border)] hover:ring-[var(--color-border-strong)] hover:-translate-y-px transition-all p-5"
-            style={{ boxShadow: 'var(--shadow-sm)' }}
-          >
-            <div className="flex flex-col md:flex-row md:items-center gap-4">
-              <div className="h-10 w-10 rounded-xl bg-[var(--color-bone-100)] ring-1 ring-[var(--color-border)] flex items-center justify-center text-[11px] font-bold text-[var(--color-ink-700)] tracking-tight shrink-0">
-                {d.formality.slice(0, 2)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className="font-semibold text-[14.5px] text-[var(--color-ink-900)]">{d.name}</span>
-                  <span className="text-[12.5px] text-[var(--color-ink-500)]">· {d.company}</span>
-                </div>
-                <div className="text-[12px] text-[var(--color-ink-500)] mt-0.5">{d.formality} · démarré le {d.date}</div>
-                <div className="mt-3 flex items-center gap-3 max-w-md">
-                  <div className="flex-1 h-1.5 rounded-full bg-[var(--color-bone-200)] overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${d.progress === 100 ? 'bg-[var(--color-sage-500)]' : 'bg-[var(--color-coral-500)]'}`} style={{ width: `${d.progress}%` }} />
-                  </div>
-                  <span className="text-[11px] font-bold tabular-nums text-[var(--color-ink-700)] w-9 text-right">{d.progress}%</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`inline-flex rounded-full ring-1 px-2.5 py-0.5 text-[11px] font-semibold ${statusColors[d.statusColor]}`}>
-                  {d.status}
-                </span>
-                <svg className="text-[var(--color-ink-400)]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-              </div>
-            </div>
+      {loading ? (
+        <div className="rounded-2xl bg-white ring-1 ring-[var(--color-border)] p-10 text-center text-[14px] text-[var(--color-ink-500)]">
+          Chargement…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl bg-white ring-1 ring-[var(--color-border)] p-12 text-center">
+          <p className="text-[14px] text-[var(--color-ink-500)]">Aucun dossier dans cette catégorie.</p>
+          <Link href="/create-company" className="btn-primary mt-6 text-[13px] inline-flex">
+            Démarrer ma première formalité
           </Link>
-        ))}
-        {filtered.length === 0 && (
-          <div className="rounded-2xl bg-white ring-1 ring-[var(--color-border)] p-10 text-center">
-            <p className="text-[14px] text-[var(--color-ink-500)]">Aucun dossier dans cette catégorie.</p>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((f) => {
+            const color = STATUS_COLORS[f.status] || 'butter'
+            const company = f.data?.companyName || f.data?.cedantNom || '—'
+            const canDownload = f.status === 'DOCUMENTS_GENERATED' || f.status === 'PAID' || f.status === 'PENDING_PAYMENT' || f.status === 'COMPLETED' || f.status === 'FILED_TO_REGISTRY'
+            return (
+              <div
+                key={f.id}
+                className="rounded-2xl bg-white ring-1 ring-[var(--color-border)] p-5"
+                style={{ boxShadow: 'var(--shadow-sm)' }}
+              >
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  <div className="h-10 w-10 rounded-xl bg-[var(--color-bone-100)] ring-1 ring-[var(--color-border)] flex items-center justify-center text-[11px] font-bold text-[var(--color-ink-700)] tracking-tight shrink-0">
+                    {(CATEGORY_LABELS[f.category] || f.category).slice(0, 2)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className="font-semibold text-[14.5px] text-[var(--color-ink-900)]">
+                        {CATEGORY_LABELS[f.category] || f.category} · {f.type}
+                      </span>
+                      <span className="text-[12.5px] text-[var(--color-ink-500)]">· {company}</span>
+                    </div>
+                    <div className="text-[12px] text-[var(--color-ink-500)] mt-0.5">
+                      Démarré le {new Date(f.createdAt).toLocaleDateString('fr-FR')} · {f.price}€
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className={`inline-flex rounded-full ring-1 px-2.5 py-0.5 text-[11px] font-semibold ${statusClass[color]}`}>
+                      {STATUS_LABELS[f.status] || f.status}
+                    </span>
+                    {canDownload && (
+                      <button
+                        onClick={() => downloadPdf(f.id)}
+                        disabled={downloadingId === f.id}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-ink-900)] hover:bg-[var(--color-ink-800)] text-white text-[12px] font-semibold py-1.5 px-3 transition-colors disabled:opacity-60"
+                      >
+                        {downloadingId === f.id ? (
+                          'Génération…'
+                        ) : (
+                          <>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                            PDF
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </DashboardLayout>
   )
 }

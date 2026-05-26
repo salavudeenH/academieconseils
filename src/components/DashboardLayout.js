@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 
 const NAV = [
   { href: '/dashboard',           label: 'Vue d\'ensemble', icon: 'home' },
@@ -10,34 +11,36 @@ const NAV = [
   { href: '/dashboard/dossiers',  label: 'Mes dossiers',    icon: 'folder' },
   { href: '/dashboard/documents', label: 'Documents',       icon: 'doc' },
   { href: '/dashboard/factures',  label: 'Factures',        icon: 'receipt' },
-  { href: '/dashboard/messages',  label: 'Messages',        icon: 'chat', badge: 2 },
+  { href: '/dashboard/messages',  label: 'Messages',        icon: 'chat' },
   { href: '/dashboard/profil',    label: 'Mon profil',      icon: 'user' },
 ]
 
 export default function DashboardLayout({ children, title, subtitle, actions }) {
   const pathname = usePathname()
-  const [user, setUser] = useState(null)
+  const router = useRouter()
+  const { data: session, status } = useSession()
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  // Redirect si non connecté (après chargement de la session)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const u = JSON.parse(window.localStorage.getItem('ac_user') || 'null')
-        setUser(u)
-      } catch {}
+    if (status === 'unauthenticated') {
+      router.push('/login?callbackUrl=' + encodeURIComponent(pathname))
     }
-  }, [])
+  }, [status, pathname, router])
 
-  const logout = () => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('ac_user')
-      window.location.href = '/'
-    }
+  if (status === 'loading' || status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-[var(--color-bone-50)] flex items-center justify-center text-[var(--color-ink-500)]">
+        Chargement…
+      </div>
+    )
   }
 
-  const initials = user?.name
-    ? user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
-    : 'AC'
+  const user = session?.user
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.name || 'Utilisateur'
+  const initials = fullName.split(' ').map((n) => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'AC'
+
+  const logout = () => signOut({ callbackUrl: '/' })
 
   return (
     <div className="min-h-screen bg-[var(--color-bone-50)] flex">
@@ -96,8 +99,8 @@ export default function DashboardLayout({ children, title, subtitle, actions }) 
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold truncate text-[var(--color-ink-900)]">{user?.name || 'Utilisateur'}</div>
-              <div className="text-[11.5px] text-[var(--color-ink-500)] truncate">{user?.email || 'utilisateur@example.com'}</div>
+              <div className="text-[13px] font-semibold truncate text-[var(--color-ink-900)]">{fullName}</div>
+              <div className="text-[11.5px] text-[var(--color-ink-500)] truncate">{user?.email || ''}</div>
             </div>
           </div>
           <button

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
+import crypto from 'crypto'
+import bcrypt from 'bcryptjs'
+import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
+import { authOptions } from '@/lib/auth'
 import { getFormality } from '@/lib/formalities/configs'
-import { generateFormalityPdf } from '@/lib/formality-pdf'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(request) {
   try {
@@ -20,9 +24,7 @@ export async function POST(request) {
       for (const f of section.fields) {
         if (f.required) {
           const v = data?.[f.name]
-          if (v === undefined || v === '' || v === null) {
-            missing.push(f.label)
-          }
+          if (v === undefined || v === '' || v === null) missing.push(f.label)
         }
       }
     }
@@ -33,7 +35,36 @@ export async function POST(request) {
       )
     }
 
-    // Création de la formalité en DB
+    // Utilisateur connecté ?
+    const session = await getServerSession(authOptions)
+    let userId = session?.user?.id || null
+    let createdUser = null
+    let tempPassword = null
+
+    // Pas connecté → on crée un compte avec l'email du fondateur/signataire
+    if (!userId) {
+      const userEmail = (data.sigEmail || data.fondateurEmail || '').toLowerCase().trim()
+      if (userEmail && EMAIL_RE.test(userEmail)) {
+        const existing = await prisma.user.findUnique({ where: { email: userEmail } })
+        if (existing) {
+          userId = existing.id
+        } else {
+          tempPassword = crypto.randomBytes(8).toString('base64')
+            .replace(/[^a-zA-Z0-9]/g, '').slice(0, 10) + 'a1!'
+          const hashed = await bcrypt.hash(tempPassword, 10)
+          const firstName = data.fondateurPrenom || data.sigPrenom || 'Client'
+          const lastName = data.fondateurNom || data.sigNom || ''
+          const phone = data.fondateurTel || data.sigTelephone || null
+          createdUser = await prisma.user.create({
+            data: { firstName, lastName, email: userEmail, password: hashed, phone },
+            select: { id: true, email: true, firstName: true, lastName: true },
+          })
+          userId = createdUser.id
+        }
+      }
+    }
+
+    // Persistance des données seulement (le PDF est généré à la demande)
     const formalityRecord = await prisma.formality.create({
       data: {
         category,
@@ -41,96 +72,50 @@ export async function POST(request) {
         price: formality.price,
         data,
         status: 'PENDING_PAYMENT',
+        userId,
       },
+      select: { id: true, category: true, type: true, status: true, createdAt: true },
     })
-
-    // Génération du PDF (en MVP, immédiatement après soumission)
-    // En production : à déclencher après confirmation Stripe webhook
-    let pdfResult = null
-    let documentRecord = null
-    try {
-      pdfResult = await generateFormalityPdf(formality, data, formalityRecord.id)
-
-      if (pdfResult?.success) {
-        // Récupération de la taille du fichier
-        let sizeBytes = null
-        try {
-          const fullPath = `${process.cwd()}/public${pdfResult.downloadUrl}`
-          sizeBytes = fs.statSync(fullPath).size
-        } catch {}
-
-        // Inscription du document généré en DB
-        documentRecord = await prisma.document.create({
-          data: {
-            type: mapDocumentType(category, type),
-            filename: pdfResult.filename,
-            path: pdfResult.downloadUrl,
-            sizeBytes,
-            formalityId: formalityRecord.id,
-          },
-        })
-
-        await prisma.formality.update({
-          where: { id: formalityRecord.id },
-          data: { status: 'DOCUMENTS_GENERATED' },
-        })
-      }
-    } catch (e) {
-      console.error('PDF gen failed:', e)
-      await prisma.formality.update({
-        where: { id: formalityRecord.id },
-        data: { status: 'FAILED' },
-      })
-    }
 
     return NextResponse.json({
       success: true,
       submissionId: formalityRecord.id,
-      pdf: pdfResult,
-      document: documentRecord
-        ? { id: documentRecord.id, filename: documentRecord.filename, downloadUrl: documentRecord.path }
-        : null,
+      account: createdUser ? { email: createdUser.email, tempPassword } : null,
       redirectUrl: `/formality/confirmation?id=${formalityRecord.id}`,
     })
   } catch (e) {
     console.error('Formality POST error:', e)
-    return NextResponse.json({ success: false, error: e.message }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Erreur serveur.' }, { status: 500 })
   }
 }
 
 export async function GET(request) {
   try {
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+
+    if (!userId) {
+      return NextResponse.json({ success: false, error: 'Non autorisé' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
     if (id) {
-      const formality = await prisma.formality.findUnique({
-        where: { id },
-        include: { documents: true },
-      })
+      const formality = await prisma.formality.findFirst({ where: { id, userId } })
       if (!formality) {
         return NextResponse.json({ success: false, error: 'Formalité introuvable' }, { status: 404 })
       }
       return NextResponse.json({ success: true, formality })
     }
 
-    // Liste — utile pour le dashboard (à brancher sur l'utilisateur connecté plus tard)
     const list = await prisma.formality.findMany({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 50,
-      include: { documents: true },
     })
     return NextResponse.json({ success: true, formalities: list })
   } catch (e) {
-    return NextResponse.json({ success: false, error: e.message }, { status: 500 })
+    console.error('Formality GET error:', e)
+    return NextResponse.json({ success: false, error: 'Erreur serveur.' }, { status: 500 })
   }
-}
-
-// Mapping catégorie+type vers DocumentType de la DB
-function mapDocumentType(category, type) {
-  if (category === 'creation') return 'STATUTES'
-  if (category === 'cession') return 'CESSION_ACT'
-  if (category === 'modification') return 'PV'
-  if (category === 'dissolution') return 'PV'
-  return 'OTHER'
 }

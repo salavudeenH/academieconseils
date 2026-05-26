@@ -24,9 +24,49 @@ function ConfirmationContent() {
   const params = useSearchParams()
   const id = params.get('id')
   const [mounted, setMounted] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState('')
+
   useEffect(() => setMounted(true), [])
 
-  const pdfUrl = id ? `/documents/${id}.pdf` : null
+  const pdfUrl = id ? `/api/formality/${id}/pdf` : null
+
+  const handleDownload = async (e) => {
+    if (!pdfUrl) return
+    e.preventDefault()
+    setDownloading(true)
+    setError('')
+    try {
+      const res = await fetch(pdfUrl)
+      if (res.status === 401) {
+        setError('Vous devez être connecté pour télécharger le document.')
+        setDownloading(false)
+        return
+      }
+      if (!res.ok) {
+        setError('Impossible de générer le PDF. Réessayez ou contactez le support.')
+        setDownloading(false)
+        return
+      }
+      const blob = await res.blob()
+      const cd = res.headers.get('Content-Disposition') || ''
+      const m = /filename="([^"]+)"/.exec(cd)
+      const filename = m?.[1] || `document-${id}.pdf`
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError('Erreur réseau. Réessayez.')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-bone-50)] flex items-center justify-center px-4 py-12 relative overflow-hidden">
@@ -54,11 +94,11 @@ function ConfirmationContent() {
 
           <span className="eyebrow">Demande reçue</span>
           <h1 className="heading-display text-[40px] md:text-[52px] text-[var(--color-ink-900)] mt-3 leading-[1.02]">
-            Votre dossier<br /><em>est en route.</em>
+            Votre dossier<br /><em>est enregistré.</em>
           </h1>
           <p className="mt-5 text-[15px] text-[var(--color-ink-600)] leading-relaxed">
-            Nos juristes vérifient votre dossier et reviennent vers vous sous 24h.
-            Vous recevez aussi une copie par email avec tous vos documents.
+            Vos informations ont bien été reçues. Vous pouvez télécharger votre document
+            ci-dessous et le retrouver à tout moment depuis votre espace client.
           </p>
 
           {mounted && id && (
@@ -76,8 +116,8 @@ function ConfirmationContent() {
               Prochaines étapes
             </div>
             {[
-              { n: '01', label: 'Vérification par un juriste', delay: 'sous 24h' },
-              { n: '02', label: 'Signature de vos documents',   delay: 'à votre rythme' },
+              { n: '01', label: 'Téléchargez votre document',  delay: 'maintenant' },
+              { n: '02', label: 'Signez les documents',         delay: 'à votre rythme' },
               { n: '03', label: 'Dépôt au greffe',              delay: '48 à 72h' },
               { n: '04', label: 'Réception du Kbis',            delay: 'par email' },
             ].map((s) => (
@@ -93,12 +133,24 @@ function ConfirmationContent() {
             ))}
           </div>
 
+          {error && (
+            <div className="mt-6 text-[13px] text-[var(--color-coral-700)] bg-[var(--color-coral-50)] ring-1 ring-[var(--color-coral-200)] rounded-xl px-3 py-2">
+              {error}
+            </div>
+          )}
+
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             {pdfUrl && (
-              <a href={pdfUrl} target="_blank" rel="noopener" className="btn-primary flex-1">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                Télécharger le document
-              </a>
+              <button onClick={handleDownload} disabled={downloading} className="btn-primary flex-1">
+                {downloading ? (
+                  <>Génération…</>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    Télécharger le document
+                  </>
+                )}
+              </button>
             )}
             <Link href="/dashboard" className="btn-secondary flex-1 sm:flex-none">
               Accéder à mon espace

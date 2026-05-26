@@ -1,24 +1,62 @@
 'use client'
 
 import { useState } from 'react'
+import { signIn } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AuthLayout from '@/components/AuthLayout'
 
 export default function RegisterPage() {
+  const router = useRouter()
   const [form, setForm] = useState({ prenom: '', nom: '', email: '', password: '', cgv: false })
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     if (!form.cgv) return
     setLoading(true)
-    setTimeout(() => {
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('ac_user', JSON.stringify({ email: form.email, name: `${form.prenom} ${form.nom}` }))
-        window.location.href = '/dashboard'
+    setError('')
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: form.prenom,
+          lastName: form.nom,
+          email: form.email,
+          password: form.password,
+        }),
+      })
+      const json = await res.json()
+
+      if (!res.ok || !json.success) {
+        setError(json.error || 'Une erreur est survenue.')
+        setLoading(false)
+        return
       }
-    }, 500)
+
+      // Auto-login après inscription réussie
+      const signRes = await signIn('credentials', {
+        email: form.email,
+        password: form.password,
+        redirect: false,
+      })
+
+      if (signRes?.error) {
+        // L'inscription a réussi mais le login auto a échoué — rediriger vers login
+        router.push('/login?registered=1')
+        return
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch (e) {
+      setError('Erreur réseau, réessayez.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -37,22 +75,22 @@ export default function RegisterPage() {
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Prénom" htmlFor="prenom">
             <input id="prenom" required value={form.prenom} onChange={(e) => setField('prenom', e.target.value)}
-              className="input-base" placeholder="Marie" />
+              className="input-base" placeholder="Marie" autoComplete="given-name" />
           </FormField>
           <FormField label="Nom" htmlFor="nom">
             <input id="nom" required value={form.nom} onChange={(e) => setField('nom', e.target.value)}
-              className="input-base" placeholder="Dubois" />
+              className="input-base" placeholder="Dubois" autoComplete="family-name" />
           </FormField>
         </div>
 
         <FormField label="Email pro" htmlFor="email">
           <input id="email" type="email" required value={form.email} onChange={(e) => setField('email', e.target.value)}
-            className="input-base" placeholder="vous@entreprise.fr" />
+            className="input-base" placeholder="vous@entreprise.fr" autoComplete="email" />
         </FormField>
 
         <FormField label="Mot de passe" htmlFor="password" help="8 caractères minimum.">
           <input id="password" type="password" required minLength={8} value={form.password} onChange={(e) => setField('password', e.target.value)}
-            className="input-base" placeholder="••••••••" />
+            className="input-base" placeholder="••••••••" autoComplete="new-password" />
         </FormField>
 
         <label className="flex items-start gap-3 text-[13px] text-[var(--color-ink-700)] pt-2 cursor-pointer">
@@ -70,6 +108,12 @@ export default function RegisterPage() {
             <Link href="/confidentialite" className="text-[var(--color-ink-900)] underline underline-offset-2 hover:text-[var(--color-coral-600)]">politique de confidentialité</Link>.
           </span>
         </label>
+
+        {error && (
+          <div className="text-[13px] text-[var(--color-coral-700)] bg-[var(--color-coral-50)] ring-1 ring-[var(--color-coral-200)] rounded-xl px-3 py-2">
+            {error}
+          </div>
+        )}
 
         <button type="submit" className="btn-primary w-full" disabled={!form.cgv || loading}>
           {loading ? 'Création…' : 'Créer mon compte'}

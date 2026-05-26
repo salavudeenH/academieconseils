@@ -1,10 +1,24 @@
 'use client'
 
 import { useState } from 'react'
+import { signIn } from 'next-auth/react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import AuthLayout from '@/components/AuthLayout'
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-[var(--color-ink-500)]">Chargement…</div>}>
+      <LoginContent />
+    </Suspense>
+  )
+}
+
+function LoginContent() {
+  const router = useRouter()
+  const params = useSearchParams()
+  const callbackUrl = params.get('callbackUrl') || '/dashboard'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,13 +28,21 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    // MVP: no real auth yet — redirect to dashboard
-    setTimeout(() => {
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('ac_user', JSON.stringify({ email }))
-        window.location.href = '/dashboard'
-      }
-    }, 400)
+
+    const res = await signIn('credentials', {
+      email,
+      password,
+      redirect: false,
+    })
+
+    if (res?.error) {
+      setError('Email ou mot de passe incorrect.')
+      setLoading(false)
+      return
+    }
+
+    router.push(callbackUrl)
+    router.refresh()
   }
 
   return (
@@ -38,7 +60,7 @@ export default function LoginPage() {
       <form onSubmit={submit} className="mt-10 space-y-4">
         <Field label="Email" htmlFor="email">
           <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-            className="input-base" placeholder="vous@entreprise.fr" />
+            className="input-base" placeholder="vous@entreprise.fr" autoComplete="email" />
         </Field>
 
         <Field
@@ -47,7 +69,7 @@ export default function LoginPage() {
           extra={<Link href="/mot-de-passe-oublie" className="text-[12px] text-[var(--color-coral-600)] hover:underline">Mot de passe oublié ?</Link>}
         >
           <input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-            className="input-base" placeholder="••••••••" />
+            className="input-base" placeholder="••••••••" autoComplete="current-password" />
         </Field>
 
         {error && (
@@ -61,17 +83,7 @@ export default function LoginPage() {
           {!loading && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>}
         </button>
 
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[var(--color-border)]" /></div>
-          <div className="relative flex justify-center"><span className="bg-white px-3 text-[11px] uppercase tracking-[0.12em] text-[var(--color-ink-500)] font-semibold">ou</span></div>
-        </div>
-
-        <button type="button" className="btn-secondary w-full">
-          <span className="font-bold text-[10px] tracking-wide bg-[var(--color-ink-900)] text-white px-1.5 py-0.5 rounded">FC</span>
-          Se connecter avec FranceConnect
-        </button>
-
-        <p className="text-[14px] text-center text-[var(--color-ink-600)] pt-4">
+        <p className="text-[14px] text-center text-[var(--color-ink-600)] pt-6">
           Pas encore de compte ? <Link href="/register" className="font-semibold text-[var(--color-ink-900)] hover:text-[var(--color-coral-600)] underline underline-offset-2">Créer un compte</Link>
         </p>
       </form>

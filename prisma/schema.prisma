@@ -21,6 +21,7 @@ model User {
   firstName String
   lastName  String
   phone     String?
+  role      UserRole @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -29,6 +30,11 @@ model User {
   orders        Order[]
 
   @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
 }
 
 // ============================================
@@ -91,7 +97,6 @@ model Formality {
   company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   orders      Order[]
-  documents   Document[]
 
   @@map("formalities")
   @@index([userId])
@@ -118,24 +123,6 @@ model Order {
   formality    Formality   @relation(fields: [formalityId], references: [id], onDelete: Cascade)
 
   @@map("orders")
-}
-
-// ============================================
-//   Documents générés (PDF)
-// ============================================
-model Document {
-  id          String       @id @default(cuid())
-  type        DocumentType
-  filename    String
-  path        String       // /documents/xxx.pdf
-  sizeBytes   Int?
-  generatedAt DateTime     @default(now())
-
-  formalityId String
-  formality   Formality    @relation(fields: [formalityId], references: [id], onDelete: Cascade)
-
-  @@map("documents")
-  @@index([formalityId])
 }
 
 // ============================================
@@ -179,15 +166,3 @@ enum OrderStatus {
   REFUNDED
 }
 
-enum DocumentType {
-  STATUTES
-  PV
-  LEGAL_NOTICE
-  DECLARATION
-  CESSION_ACT
-  POWER_OF_ATTORNEY
-  ACCOUNT_DEPOSIT
-  INVOICE
-  KBIS
-  OTHER
-}
